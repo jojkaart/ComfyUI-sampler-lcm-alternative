@@ -45,7 +45,7 @@ class LCMScheduler:
 
     FUNCTION = "get_sigmas"
 
-    def get_sigmas(self, model, scheduler, steps, step_to_multiply, multiplier):
+    def get_sigmas(self, model, steps):
         sigmas = comfy.samplers.calculate_sigmas_scheduler(model.model, "sgm_uniform", steps).cpu()
         return (sigmas, )
 
@@ -68,6 +68,6 @@ class SamplerLCMAlternative:
 
 
 NODE_CLASS_MAPPINGS = {
-    "LCMAlternativeScheduler": LCMAlternativeScheduler,
+    "LCMScheduler": LCMScheduler,
     "SamplerLCMAlternative": SamplerLCMAlternative,
 }
