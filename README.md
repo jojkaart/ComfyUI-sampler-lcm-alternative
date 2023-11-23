@@ -17,3 +17,7 @@ If you're doing txt2img with LCM and feel like LCM is giving boring or artificia
 - `ancestral`, same as with SamplerLCMAlternative
 
 The default settings should work fine. I recommend using at least 6 steps to allow for 2 full cycles, that said, this sampler seems to really benefit from extra steps.
+
+Here's an example workflow for how to use SamplerLCMCycle:
+![SampleLCMCycle example](SamplerLCMCycle-example.png)
+
