@@ -80,8 +80,8 @@ class SamplerLCMAlternative:
     def INPUT_TYPES(s):
         return {"required":
                     {"euler_steps": ("INT", {"default": 0, "min": -10000, "max": 10000}),
-                     "ancestral": ("FLOAT", {"default": 0, "min": 0, "max": 1.0, "step": 0.01, "round": True}),
-                     "noise_mult": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.001, "round": True}),
+                     "ancestral": ("FLOAT", {"default": 0, "min": 0, "max": 1.0, "step": 0.01, "round": False}),
+                     "noise_mult": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.001, "round": False}),
                     }
                }
     RETURN_TYPES = ("SAMPLER",)
