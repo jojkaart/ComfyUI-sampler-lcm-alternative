@@ -18,6 +18,8 @@ If you're doing txt2img with LCM and feel like LCM is giving boring or artificia
 
 The default settings should work fine. I recommend using at least 6 steps to allow for 2 full cycles, that said, this sampler seems to really benefit from extra steps.
 
+**I also higly recommend using the `RescaleCFG` node when using LCM Lora. With that, you can bump CFG up to 3.0 and sometimes even higher, which really helps quality and the effectiveness of negative prompt.**
+
 Here's an example workflow for how to use SamplerLCMCycle:
 ![SampleLCMCycle example](SamplerLCMCycle-example.png)
 
