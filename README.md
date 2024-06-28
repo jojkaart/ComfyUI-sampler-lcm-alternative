@@ -4,6 +4,12 @@ ComfyUI Custom Sampler nodes that add a new improved LCM sampler functions
 This custom node repository adds three new nodes for ComfyUI to the Custom Sampler category. SamplerLCMAlternative, SamplerLCMCycle and LCMScheduler (just to save a few clicks, as you could also use the BasicScheduler and choose smg_uniform).
 Just clone it into your custom_nodes folder and you can start using it as soon as you restart ComfyUI.
 
+Update 2024.06.24: I've added a new sampler SamplerLCMDualNoise. I consider the others obsolete now due to how stunnigly well this new sampler works. It achieves great results on SD1.5 (yes, the ORIGINAL!) plus LCM Lora with CFG 1.0 and only positive prompt.
+
+SamplerLCMDualNoise has one extra parameter.
+- `weight`, this sampler simultaneously samples with Euler and LCM on every step. This parameter controls the weight each of them is given for the results. 0.0 results in a result that's identical with the original LCM sampler. 1.0 is identical to Euler.
+  I've experimentally found that weights between 0.66 and 0.95 seem to work best. The best weight depends on the number of steps and might also be affected by the prompt, CFG and other parameters. Consider these as rough starting points: 50 steps -> weight 0.95, 4 steps -> weight 0.66, 16 steps -> weight 0.8
+
 SamplerLCMAlternative has two extra parameters.
 - `euler_steps`, which tells the sampler to use Euler sampling for the first n steps (or skip euler only for last n steps if n is negative).
 - `ancestral`, If you give this a value above 0.0, the Euler steps get some fresh randomness injected each step. The value controls how much.
