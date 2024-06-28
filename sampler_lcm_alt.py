@@ -119,9 +119,51 @@ class SamplerLCMCycle:
         sampler = comfy.samplers.KSAMPLER(sample_lcm_cycle, extra_options={"euler_steps": euler_steps, "lcm_steps": lcm_steps, "tweak_sigmas": tweak_sigmas, "ancestral": ancestral})
         return (sampler, )
 
+@torch.no_grad()
+def sample_lcm_dual_noise(model, x, sigmas, extra_args=None, callback=None, disable=None, noise_sampler=None, weight=0.5):
+    extra_args = extra_args or {}
+    noise_sampler = noise_sampler or default_noise_sampler(x)
+    s_in = x.new_ones([x.shape[0]])
+    sampling_model = model.inner_model.inner_model.model_sampling
+    for i in trange(len(sigmas) - 1, disable=disable):
+        denoised = model(x, sigmas[i] * s_in, **extra_args)
+        if callback:
+            callback({'x': x, 'i': i, 'sigma': sigmas[i], 'sigma_hat': sigmas[i], 'denoised': denoised})
+
+        if sigmas[i + 1] > 0:
+            removed_noise = (x - denoised) / sigmas[i]
+            new_noise = noise_sampler(sigmas[i], sigmas[i + 1])
+
+            x2 = sampling_model.noise_scaling(sigmas[i], new_noise, denoised)
+            denoised2 = model(x2, sigmas[i] * s_in, **extra_args)
+            denoised = denoised * weight + denoised2 * (1.0 - weight)
+
+            x = denoised + (sigmas[i + 1] * removed_noise)
+        else:
+            x = denoised
+
+    return x
+
+class SamplerLCMDualNoise:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "weight": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 1.0, "step": 0.001, "round": False}),
+            }
+        }
+
+    RETURN_TYPES = ("SAMPLER",)
+    CATEGORY = "sampling/custom_sampling/samplers"
+    FUNCTION = "get_sampler"
+
+    def get_sampler(self, weight):
+        return (comfy.samplers.KSAMPLER(sample_lcm_dual_noise, extra_options={"weight": weight}),)
+
 
 NODE_CLASS_MAPPINGS = {
     "LCMScheduler": LCMScheduler,
     "SamplerLCMAlternative": SamplerLCMAlternative,
     "SamplerLCMCycle": SamplerLCMCycle,
+    "SamplerLCMDualNoise": SamplerLCMDualNoise,
 }
