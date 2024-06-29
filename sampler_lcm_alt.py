@@ -120,11 +120,25 @@ class SamplerLCMCycle:
         return (sampler, )
 
 @torch.no_grad()
-def sample_lcm_dual_noise(model, x, sigmas, extra_args=None, callback=None, disable=None, noise_sampler=None, weight=0.5):
+def sample_lcm_dual_noise(model, x, sigmas, extra_args=None, callback=None, disable=None, noise_sampler=None, weight=0.5, normalize_steps=0, reuse_lcm_noise=False, parallel=False):
     extra_args = extra_args or {}
     noise_sampler = noise_sampler or default_noise_sampler(x)
     s_in = x.new_ones([x.shape[0]])
     sampling_model = model.inner_model.inner_model.model_sampling
+    if reuse_lcm_noise:
+        dual_noise = noise_sampler(sigmas[0], sigmas[1])
+        noise_sampler = lambda i,j: dual_noise
+
+# Normalization steps
+    if normalize_steps > 0:
+        highest_sigma = sigmas[0]
+        for i in range(normalize_steps):
+            denoised = model(x, highest_sigma * s_in, **extra_args)
+            if callback:
+                callback({'x': x, 'i': i, 'sigma': sigmas[0], 'sigma_hat': sigmas[0], 'denoised': denoised})
+            x = sampling_model.noise_scaling(highest_sigma, model.noise, denoised)
+
+    previous_denoised = None
     for i in trange(len(sigmas) - 1, disable=disable):
         denoised = model(x, sigmas[i] * s_in, **extra_args)
         if callback:
@@ -132,13 +146,17 @@ def sample_lcm_dual_noise(model, x, sigmas, extra_args=None, callback=None, disa
 
         if sigmas[i + 1] > 0:
             removed_noise = (x - denoised) / sigmas[i]
-            new_noise = noise_sampler(sigmas[i], sigmas[i + 1])
 
-            x2 = sampling_model.noise_scaling(sigmas[i], new_noise, denoised)
-            denoised2 = model(x2, sigmas[i] * s_in, **extra_args)
-            denoised = denoised * weight + denoised2 * (1.0 - weight)
+            if not parallel:
+                previous_denoised = denoised
+            if previous_denoised is not None:
+                new_noise = noise_sampler(sigmas[i], sigmas[i + 1])
+                x2 = sampling_model.noise_scaling(sigmas[i], new_noise, previous_denoised)
+                denoised2 = model(x2, sigmas[i] * s_in, **extra_args)
+                denoised = denoised * weight + denoised2 * (1.0 - weight)
 
             x = denoised + (sigmas[i + 1] * removed_noise)
+            previous_denoised = denoised
         else:
             x = denoised
 
@@ -150,6 +168,9 @@ class SamplerLCMDualNoise:
         return {
             "required": {
                 "weight": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 1.0, "step": 0.001, "round": False}),
+                "normalize_steps": ("INT", {"default": 0, "min": 0, "max": 50, "step": 1}),
+                "reuse_lcm_noise": ("BOOLEAN", {"default": False}),
+                "parallel": ("BOOLEAN", {"default": False}),
             }
         }
 
@@ -157,8 +178,8 @@ class SamplerLCMDualNoise:
     CATEGORY = "sampling/custom_sampling/samplers"
     FUNCTION = "get_sampler"
 
-    def get_sampler(self, weight):
-        return (comfy.samplers.KSAMPLER(sample_lcm_dual_noise, extra_options={"weight": weight}),)
+    def get_sampler(self, weight, normalize_steps, reuse_lcm_noise, parallel):
+        return (comfy.samplers.KSAMPLER(sample_lcm_dual_noise, extra_options={"weight": weight, "normalize_steps": normalize_steps, "reuse_lcm_noise": reuse_lcm_noise, "parallel": parallel}),)
 
 
 NODE_CLASS_MAPPINGS = {

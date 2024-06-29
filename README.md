@@ -4,11 +4,15 @@ ComfyUI Custom Sampler nodes that add a new improved LCM sampler functions
 This custom node repository adds three new nodes for ComfyUI to the Custom Sampler category. SamplerLCMAlternative, SamplerLCMCycle and LCMScheduler (just to save a few clicks, as you could also use the BasicScheduler and choose smg_uniform).
 Just clone it into your custom_nodes folder and you can start using it as soon as you restart ComfyUI.
 
+Update 2024.06.29: I've added more parameters to SamplerLCMDualNoise. normalize_steps, reuse_lcm_noise and parallel.
 Update 2024.06.24: I've added a new sampler SamplerLCMDualNoise. I consider the others obsolete now due to how stunnigly well this new sampler works. It achieves great results on SD1.5 (yes, the ORIGINAL!) plus LCM Lora with CFG 1.0 and only positive prompt.
 
-SamplerLCMDualNoise has one extra parameter.
-- `weight`, this sampler does Euler sampling with an additional LCM sampling step after each Euler step. The results are then combined with weighted average function. This parameter controls how strongly the results bias towards the Euler sampler. 0.0 means both samplers are applied in full. 1.0 makes this sampler the same as Euler.
+SamplerLCMDualNoise has four extra parameters.
+- `weight`, With default settings, this sampler does Euler sampling with an additional LCM sampling step after each Euler step. The results are then combined with a weighted average function. This parameter controls how strongly the results bias towards the Euler sampler. 0.0 means both samplers are applied in full. 1.0 makes this sampler the same as Euler.
   I've experimentally found that weights between 0.66 and 0.95 seem to work best. The best weight depends on the number of steps and might also be affected by the prompt, CFG and other parameters. Consider these as rough starting points: 50 steps -> weight 0.95, 4 steps -> weight 0.66, 16 steps -> weight 0.8
+- `normalize_steps`, this parameter runs the model `normalize_steps` times at the first sigma in the schedule and returns the original noise after each run. After that the normal sampling begins. The intention is to push the random distribution of the initial noise towards what the model tended to encounter during training. Hence, only do this for txt2img. img2img doesn't need it.
+- `reuse_lcm_noise`, When this is false, the LCM step always uses fresh noise. When this is true, all LCM steps apply the same noise as the first step. Mainly useful with img2img when you want to add fine details to the scene.
+- `parallel`, When false, euler and LCM samplings are done sequentially. LCM sampling processes the result of the Euler sampling after which the results are combined. When true, both samplers will process the result of the previous combined step.
 
 SamplerLCMAlternative has two extra parameters.
 - `euler_steps`, which tells the sampler to use Euler sampling for the first n steps (or skip euler only for last n steps if n is negative).
