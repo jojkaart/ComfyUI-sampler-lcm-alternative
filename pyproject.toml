@@ -1,14 +1,14 @@
 [project]
 name = "comfyui-sampler-lcm-alternative"
-description = "Nodes:LCMScheduler, SamplerLCMAlternative, SamplerLCMCycle. ComfyUI Custom Sampler nodes that add a new improved LCM sampler functions"
+description = "Nodes:LCMScheduler, SamplerLCMAlternative, SamplerLCMCycle, SamplerLCMDualNoise. ComfyUI Custom Sampler nodes that add a new improved LCM sampler functions"
 version = "1.0.0"
-license = "LICENSE"
+license = "GPL3"
 
 [project.urls]
 Repository = "https://github.com/jojkaart/ComfyUI-sampler-lcm-alternative"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "elriel"
 DisplayName = "ComfyUI-sampler-lcm-alternative"
 Icon = ""
