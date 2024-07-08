@@ -147,13 +147,14 @@ def sample_lcm_dual_noise(model, x, sigmas, extra_args=None, callback=None, disa
         if sigmas[i + 1] > 0:
             removed_noise = (x - denoised) / sigmas[i]
 
+            step_weight = weight * (1.0 - (sigmas[i+1] / sigmas[i]))
             if not parallel:
                 previous_denoised = denoised
             if previous_denoised is not None:
                 new_noise = noise_sampler(sigmas[i], sigmas[i + 1])
                 x2 = sampling_model.noise_scaling(sigmas[i], new_noise, previous_denoised)
                 denoised2 = model(x2, sigmas[i] * s_in, **extra_args)
-                denoised = denoised * weight + denoised2 * (1.0 - weight)
+                denoised = denoised * (1.0 - step_weight) + denoised2 * step_weight
 
             x = denoised + (sigmas[i + 1] * removed_noise)
             previous_denoised = denoised
@@ -167,7 +168,7 @@ class SamplerLCMDualNoise:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "weight": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 1.0, "step": 0.001, "round": False}),
+                "weight": ("FLOAT", {"default": 0.65, "min": 0.0, "max": 1.0, "step": 0.001, "round": False}),
                 "normalize_steps": ("INT", {"default": 0, "min": 0, "max": 50, "step": 1}),
                 "reuse_lcm_noise": ("BOOLEAN", {"default": False}),
                 "parallel": ("BOOLEAN", {"default": False}),
@@ -181,10 +182,93 @@ class SamplerLCMDualNoise:
     def get_sampler(self, weight, normalize_steps, reuse_lcm_noise, parallel):
         return (comfy.samplers.KSAMPLER(sample_lcm_dual_noise, extra_options={"weight": weight, "normalize_steps": normalize_steps, "reuse_lcm_noise": reuse_lcm_noise, "parallel": parallel}),)
 
+def adaptive_geometric_median(tensor_list, vector_dim, tolerance=1e-6, max_steps=100):
+    """
+    Approximate the geometric median for a list of tensors using an adaptive approach.
+    
+    Args:
+    tensor_list : list of torch.Tensor
+        List of tensors containing 4D vectors.
+    vector_dim : int
+        The dimension along which the 4D vectors are found.
+    tolerance : float, optional
+        The convergence tolerance (default is 1e-6).
+    max_steps : int, optional
+        Maximum number of steps for the approximation (default is 100).
+    
+    Returns:
+    median : torch.Tensor
+        The approximated geometric median.
+    steps : int
+        The number of steps taken to converge.
+    """
+    # Combine all tensors along a new dimension
+    combined = torch.stack(tensor_list, dim=0)
+    
+    # Start with the mean as an initial guess
+    median = torch.mean(combined, dim=0)
+    
+    for steps in range(1, max_steps + 1):
+        distances = torch.norm(combined - median.unsqueeze(0), dim=vector_dim, keepdim=True)
+        weights = 1.0 / (distances + 1e-8)  # Add small epsilon to avoid division by zero
+        weights_sum = weights.sum(dim=0, keepdim=True)
+        new_median = (weights * combined).sum(dim=0) / weights_sum.squeeze(0)
+        
+        # Check for convergence
+        if torch.norm(new_median - median) / torch.norm(median) < tolerance:
+            return new_median, steps
+        
+        median = new_median
+    
+    return median, max_steps
+
+@torch.no_grad()
+def sample_lcm_parallel(model, x, sigmas, extra_args=None, callback=None, disable=None, noise_sampler=None, samples_per_step = 5, consistent_noise=False, adaptive_precision = 1e-6):
+    extra_args = extra_args or {}
+    noise_sampler = noise_sampler or default_noise_sampler(x)
+    s_in = x.new_ones([x.shape[0]])
+    apply_noise = model.inner_model.inner_model.model_sampling.noise_scaling
+    noise_list = None
+    if consistent_noise:
+        noise_list = [noise_sampler(sigmas[0],sigmas[1]) for _ in range(samples_per_step)]
+    
+    denoised = x
+    for i in trange(len(sigmas) - 1, disable=disable):
+        if not consistent_noise:
+            noise_list = [noise_sampler(sigmas[0],sigmas[1]) for _ in range(samples_per_step)]
+        noised = [apply_noise(sigmas[i],noise,denoised) for noise in noise_list]
+        denoised_samples = [model(x, sigmas[i] *s_in, **extra_args) for x in noised]
+        denoised, steps = adaptive_geometric_median(denoised_samples,2,adaptive_precision,100)
+        noise_list = [(x - denoised) / sigmas[i] for x in noised]
+        
+        if callback:
+            callback({'x': noised[0], 'i': i, 'sigma': sigmas[i], 'sigma_hat': sigmas[i], 'denoised': denoised})
+
+    return denoised
+
+class SamplerLCMParallel:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "samples_per_step": ("INT", {"default": 5, "min": 1, "max": 50, "step": 1}),
+                "consistent_noise": ("BOOLEAN", {"default": False}),
+                "adaptive_precision": ("INT", {"default": 6, "min": 1, "max": 10, "step": 1}),
+            }
+        }
+
+    RETURN_TYPES = ("SAMPLER",)
+    CATEGORY = "sampling/custom_sampling/samplers"
+    FUNCTION = "get_sampler"
+
+    def get_sampler(self, samples_per_step, consistent_noise, adaptive_precision):
+        return (comfy.samplers.KSAMPLER(sample_lcm_parallel, extra_options={"samples_per_step": samples_per_step, "consistent_noise": consistent_noise, "adaptive_precision": 10**(-adaptive_precision)}),)
+
 
 NODE_CLASS_MAPPINGS = {
     "LCMScheduler": LCMScheduler,
     "SamplerLCMAlternative": SamplerLCMAlternative,
     "SamplerLCMCycle": SamplerLCMCycle,
     "SamplerLCMDualNoise": SamplerLCMDualNoise,
+    "SamplerLCMParallel": SamplerLCMParallel,
 }
