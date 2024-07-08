@@ -120,7 +120,7 @@ class SamplerLCMCycle:
         return (sampler, )
 
 @torch.no_grad()
-def sample_lcm_dual_noise(model, x, sigmas, extra_args=None, callback=None, disable=None, noise_sampler=None, weight=0.5, normalize_steps=0, reuse_lcm_noise=False, parallel=False):
+def sample_lcm_dual_noise(model, x, sigmas, extra_args=None, callback=None, disable=None, noise_sampler=None, weight=0.5, normalize_steps=0, reuse_lcm_noise=False, parallel=False, dynamic_weight=True):
     extra_args = extra_args or {}
     noise_sampler = noise_sampler or default_noise_sampler(x)
     s_in = x.new_ones([x.shape[0]])
@@ -138,6 +138,7 @@ def sample_lcm_dual_noise(model, x, sigmas, extra_args=None, callback=None, disa
                 callback({'x': x, 'i': i, 'sigma': sigmas[0], 'sigma_hat': sigmas[0], 'denoised': denoised})
             x = sampling_model.noise_scaling(highest_sigma, model.noise, denoised)
 
+    step_weight = 1.0 - weight
     previous_denoised = None
     for i in trange(len(sigmas) - 1, disable=disable):
         denoised = model(x, sigmas[i] * s_in, **extra_args)
@@ -147,7 +148,8 @@ def sample_lcm_dual_noise(model, x, sigmas, extra_args=None, callback=None, disa
         if sigmas[i + 1] > 0:
             removed_noise = (x - denoised) / sigmas[i]
 
-            step_weight = weight * (1.0 - (sigmas[i+1] / sigmas[i]))
+            if dynamic_weight:
+                step_weight = weight * (1.0 - (sigmas[i+1] / sigmas[i]))
             if not parallel:
                 previous_denoised = denoised
             if previous_denoised is not None:
@@ -168,20 +170,36 @@ class SamplerLCMDualNoise:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "weight": ("FLOAT", {"default": 0.65, "min": 0.0, "max": 1.0, "step": 0.001, "round": False}),
+                "weight": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 1.0, "step": 0.001, "round": False}),
                 "normalize_steps": ("INT", {"default": 0, "min": 0, "max": 50, "step": 1}),
                 "reuse_lcm_noise": ("BOOLEAN", {"default": False}),
                 "parallel": ("BOOLEAN", {"default": False}),
             }
         }
-
     RETURN_TYPES = ("SAMPLER",)
     CATEGORY = "sampling/custom_sampling/samplers"
     FUNCTION = "get_sampler"
 
     def get_sampler(self, weight, normalize_steps, reuse_lcm_noise, parallel):
-        return (comfy.samplers.KSAMPLER(sample_lcm_dual_noise, extra_options={"weight": weight, "normalize_steps": normalize_steps, "reuse_lcm_noise": reuse_lcm_noise, "parallel": parallel}),)
+        return (comfy.samplers.KSAMPLER(sample_lcm_dual_noise, extra_options={"weight": weight, "normalize_steps": normalize_steps, "reuse_lcm_noise": reuse_lcm_noise, "parallel": parallel, "dynamic_weight": False}),)
 
+class SamplerLCMDuoFusion:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "weight": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 3.0, "step": 0.001, "round": False}),
+                "reuse_noise": ("BOOLEAN", {"default": False}),
+            }
+        }
+    dynamic_weight = True
+    RETURN_TYPES = ("SAMPLER",)
+    CATEGORY = "sampling/custom_sampling/samplers"
+    FUNCTION = "get_sampler"
+
+    def get_sampler(self, weight, reuse_noise):
+        return (comfy.samplers.KSAMPLER(sample_lcm_dual_noise, extra_options={"weight": weight, "reuse_lcm_noise": reuse_noise, "dynamic_weight": True}),)
+    
 def adaptive_geometric_median(tensor_list, vector_dim, tolerance=1e-6, max_steps=100):
     """
     Approximate the geometric median for a list of tensors using an adaptive approach.
@@ -270,5 +288,6 @@ NODE_CLASS_MAPPINGS = {
     "SamplerLCMAlternative": SamplerLCMAlternative,
     "SamplerLCMCycle": SamplerLCMCycle,
     "SamplerLCMDualNoise": SamplerLCMDualNoise,
+    "SamplerLCMDuoFusion": SamplerLCMDuoFusion,
     "SamplerLCMParallel": SamplerLCMParallel,
 }
