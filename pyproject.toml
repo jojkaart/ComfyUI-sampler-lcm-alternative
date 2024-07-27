@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-sampler-lcm-alternative"
-description = "Nodes:LCMScheduler, SamplerLCMAlternative, SamplerLCMCycle, SamplerLCMDualNoise. ComfyUI Custom Sampler nodes that add a new improved LCM sampler functions"
-version = "1.0.0"
+description = "Nodes:LCMScheduler, SamplerLCMAlternative, SamplerLCMCycle, SamplerLCMDualNoise, SamplerLCMDuoFusion. ComfyUI Custom Sampler nodes that add a new improved LCM sampler functions"
+version = "1.1.0"
 license = "GPL3"
 
 [project.urls]
