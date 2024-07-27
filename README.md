@@ -4,8 +4,13 @@ ComfyUI Custom Sampler nodes that add a new improved LCM sampler functions
 This custom node repository adds three new nodes for ComfyUI to the Custom Sampler category. SamplerLCMAlternative, SamplerLCMCycle and LCMScheduler (just to save a few clicks, as you could also use the BasicScheduler and choose smg_uniform).
 Just clone it into your custom_nodes folder and you can start using it as soon as you restart ComfyUI.
 
+Update 2024.07.08: I've added a new node SamplerLCMDuoFusion. It's very similar to DualNoise, but easier to use because weight parameter only requires tuning when you change the model rather than every time you adjust the number of steps. Might also be slightly better in terms of quality on average, but that's hard to verify. 
 Update 2024.06.29: I've added more parameters to SamplerLCMDualNoise. normalize_steps, reuse_lcm_noise and parallel.
 Update 2024.06.24: I've added a new sampler SamplerLCMDualNoise. I consider the others obsolete now due to how stunnigly well this new sampler works. It achieves great results on SD1.5 (yes, the ORIGINAL!) plus LCM Lora with CFG 1.0 and only positive prompt.
+
+SamplerLCMDuoFusion has two extra parameters.
+- `weight`, if this is 0.0, the sampler acts like Euler. Anything more and it's running two denoisers at once and combining the results. Different models (and maybe styles?) require different amount of weight for optimal results. So far my theory is that for photorealism 1.0 seems close to optimal while for anime 0.6 could work better, or something in between.
+- `reuse_noise`, whether to run the second denoiser with random noise for each step or whether to reuse the same noise every time. When true, the results tend to become a bit sharper and might end up requiring a reduction in weight for optimal results. Mainly good for img2img.
 
 SamplerLCMDualNoise has four extra parameters.
 - `weight`, With default settings, this sampler does Euler sampling with an additional LCM sampling step after each Euler step. The results are then combined with a weighted average function. This parameter controls how strongly the results bias towards the Euler sampler. 0.0 means both samplers are applied in full. 1.0 makes this sampler the same as Euler.
