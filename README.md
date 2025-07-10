@@ -1,4 +1,7 @@
 # ComfyUI-sampler-lcm-alternative
+
+**For detailed explanations of nodes and parameters in Chinese, please refer to: [https://plugin.aix.ink](https://plugin.aix.ink)**
+
 ComfyUI Custom Sampler nodes that add a new improved LCM sampler functions
 
 This custom node repository adds three new nodes for ComfyUI to the Custom Sampler category. SamplerLCMAlternative, SamplerLCMCycle and LCMScheduler (just to save a few clicks, as you could also use the BasicScheduler and choose smg_uniform).
