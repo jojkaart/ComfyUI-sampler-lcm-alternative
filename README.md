@@ -1,6 +1,6 @@
 # ComfyUI-sampler-lcm-alternative
 
-**For detailed explanations of nodes and parameters in Chinese, please refer to: [https://plugin.aix.ink](https://plugin.aix.ink)**
+**节点及参数的详细中文解释请参考: [https://plugin.aix.ink/archives/EOvN13uv](https://plugin.aix.ink/archives/EOvN13uv)**
 
 ComfyUI Custom Sampler nodes that add a new improved LCM sampler functions
 
